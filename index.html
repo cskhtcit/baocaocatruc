@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Báo Cáo CLDV Hàng Tuần - Tuần 31</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel JSX Compiler -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Recharts Dependencies -->
+    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.12.3/umd/Recharts.js"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Cấu hình phân trang in ấn / xuất PDF chuẩn xác theo yêu cầu */
+        @media print {
+            body { background: white !important; font-size: 11px !important; }
+            .print\:hidden { display: none !important; }
+            .print\:block { display: block !important; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .shadow-xl, .shadow-sm, .shadow-md { box-shadow: none !important; }
+            
+            /* Trang 1: Tiêu đề, KPI + Tab 1 */
+            .print-page-1 {
+                break-before: avoid;
+                break-after: page;
+            }
+            /* Trang 2: Tab 2 */
+            .print-page-2 {
+                break-before: page;
+                break-after: page;
+            }
+            /* Trang 3: Tab 3 */
+            .print-page-3 {
+                break-before: page;
+                break-after: page;
+            }
+            /* Trang 4: Bản đồ, Biểu đồ, Thống kê tiến trình */
+            .print-page-4 {
+                break-before: page;
+                break-after: page;
+            }
+            /* Phần công ty sổ ra & Kế hoạch tuần tới */
+            .print-page-4-details {
+                break-before: auto;
+                break-inside: auto;
+            }
+
+            /* Thu nhỏ đồng đều các ô tên công ty khi in & TUYỆT ĐỐI KHÔNG BỊ CẮT ĐÔI */
+            .print-compact-grid {
+                display: grid !important;
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                gap: 6px !important;
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+            }
+            .print-compact-card {
+                padding: 6px 8px !important;
+                font-size: 10px !important;
+                border-radius: 4px !important;
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                background-color: #ffffff !important;
+                border: 1px solid #cbd5e1 !important;
+            }
+            .print-compact-section {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                margin-bottom: 12px !important;
+            }
+
+            /* Đảm bảo hiển thị biểu đồ SVG khi in */
+            .recharts-responsive-container {
+                width: 100% !important;
+                height: 280px !important;
+            }
+            .recharts-wrapper, .recharts-surface {
+                overflow: visible !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans antialiased min-h-screen relative">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+        const { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } = Recharts;
+
+        // --- HOOK ĐẾM SỐ TỰ ĐỘNG CHẠY TỪ 0 ---
+        function useCountUp(endValue, duration = 1000, trigger = true) {
+            const [count, setCount] = useState(0);
+            useEffect(() => {
+                if (!trigger) {
+                    setCount(0);
+                    return;
+                }
+                setCount(0);
+                let startTimestamp = null;
+                const step = (timestamp) => {
+                    if (!startTimestamp) startTimestamp = timestamp;
+                    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                    setCount(Math.floor(progress * endValue));
+                    if (progress < 1) {
+                        window.requestAnimationFrame(step);
+                    } else {
+                        setCount(endValue);
+                    }
+                };
+                window.requestAnimationFrame(step);
+            }, [endValue, duration, trigger]);
+            return count;
+        }
+
+        // --- BIỂU TƯỢNG SVG AN TOÀN ---
+        const IconChart = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>);
+        const IconAlert = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>);
+        const IconPhone = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>);
+        const IconUsers = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>);
+        const IconCheck = () => (<svg className="w-4 h-4 text-emerald-500 mr-1.5 inline flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>);
+        const IconPrint = () => (<svg className="w-4 h-4 inline-block mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>);
+
+        // --- CƠ SỞ DỮ LIỆU TUẦN 31 ---
+        const REPORT_DATA = {
+            title: "TUẦN 31 NĂM 2026",
+            range: "Từ ngày 24/7/2026 – 30/7/2026",
+            overview: {
+                totalTeuNum: 13186,
+                totalGrowth: "-4,5%",
+                emptyTeu: "5.157",
+                emptyGrowth: "-17,3%",
+                ladenTeu: "8.029",
+                ladenGrowth: "+6,1%",
+                totalCont: "7.075",
+                incidentsNum: 2,
+                incidentsDesc: "1 Cao, 1 Trung bình",
+                callCountNum: 219,
+                transferCountNum: 26,
+                callGrowthCall: "-2%",
+                callGrowthTrans: "-55%",
+                totalConnectedKhNum: 15,
+                khMet: "2 công ty đã gặp mặt"
+            },
+            volumeDetails: [
+                { 
+                    name: "Giao cont hàng chuyển cảng", 
+                    rongCont: 0, hangCont: 201, cont: 201, teu: 379, change: "+576%", trend: "up",
+                    rongSizes: { "20'": 0, "40'": 0, "45'": 0 },
+                    hangSizes: { "20'": 23, "40'": 178, "45'": 0 },
+                    totalSizes: { "20'": 23, "40'": 178, "45'": 0 }
+                },
+                { 
+                    name: "Cấp rỗng", 
+                    rongCont: 657, hangCont: 0, cont: 657, teu: 1228, change: "-10%", trend: "down",
+                    rongSizes: { "20'": 86, "40'": 568, "45'": 3 },
+                    hangSizes: { "20'": 0, "40'": 0, "45'": 0 },
+                    totalSizes: { "20'": 86, "40'": 568, "45'": 3 }
+                },
+                { 
+                    name: "Giao cont chuyển cảng (Dv TCIT)", 
+                    rongCont: 1955, hangCont: 133, cont: 2088, teu: 3857, change: "-18%", trend: "down",
+                    rongSizes: { "20'": 288, "40'": 1586, "45'": 81 },
+                    hangSizes: { "20'": 31, "40'": 101, "45'": 1 },
+                    totalSizes: { "20'": 319, "40'": 1687, "45'": 82 }
+                },
+                { 
+                    name: "Cấp rỗng chỉ định", 
+                    rongCont: 0, hangCont: 0, cont: 0, teu: 0, change: "Không phát sinh", trend: "neutral",
+                    rongSizes: { "20'": 0, "40'": 0, "45'": 0 },
+                    hangSizes: { "20'": 0, "40'": 0, "45'": 0 },
+                    totalSizes: { "20'": 0, "40'": 0, "45'": 0 }
+                },
+                { 
+                    name: "Giao cont hàng nhập", 
+                    rongCont: 0, hangCont: 487, cont: 487, teu: 886, change: "-25%", trend: "down",
+                    rongSizes: { "20'": 0, "40'": 0, "45'": 0 },
+                    hangSizes: { "20'": 88, "40'": 399, "45'": 0 },
+                    totalSizes: { "20'": 88, "40'": 399, "45'": 0 }
+                },
+                { 
+                    name: "Giao cont hàng nhập nội địa", 
+                    rongCont: 0, hangCont: 53, cont: 53, teu: 60, change: "+900%", trend: "up",
+                    rongSizes: { "20'": 0, "40'": 0, "45'": 0 },
+                    hangSizes: { "20'": 46, "40'": 7, "45'": 0 },
+                    totalSizes: { "20'": 46, "40'": 7, "45'": 0 }
+                },
+                { 
+                    name: "Giao thẳng quá cảnh", 
+                    rongCont: 0, hangCont: 0, cont: 0, teu: 0, change: "Không phát sinh", trend: "neutral",
+                    rongSizes: { "20'": 0, "40'": 0, "45'": 0 },
+                    hangSizes: { "20'": 0, "40'": 0, "45'": 0 },
+                    totalSizes: { "20'": 0, "40'": 0, "45'": 0 }
+                },
+                { 
+                    name: "Hạ cont hàng xuất chuyển cảng", 
+                    rongCont: 0, hangCont: 1187, cont: 1187, teu: 2372, change: "-9%", trend: "down",
+                    rongSizes: { "20'": 0, "40'": 0, "45'": 0 },
+                    hangSizes: { "20'": 2, "40'": 1182, "45'": 3 },
+                    totalSizes: { "20'": 2, "40'": 1182, "45'": 3 }
+                },
+                { 
+                    name: "Hạ cont hàng xuất", 
+                    rongCont: 0, hangCont: 2108, cont: 2108, teu: 3941, change: "+9%", trend: "up",
+                    rongSizes: { "20'": 0, "40'": 0, "45'": 0 },
+                    hangSizes: { "20'": 275, "40'": 1815, "45'": 18 },
+                    totalSizes: { "20'": 275, "40'": 1815, "45'": 18 }
+                },
+                { 
+                    name: "Hạ cont hàng xuất nội địa", 
+                    rongCont: 0, hangCont: 44, cont: 44, teu: 69, change: "+86%", trend: "up",
+                    rongSizes: { "20'": 0, "40'": 0, "45'": 0 },
+                    hangSizes: { "20'": 19, "40'": 25, "45'": 0 },
+                    totalSizes: { "20'": 19, "40'": 25, "45'": 0 }
+                },
+                { 
+                    name: "Nhận container rỗng", 
+                    rongCont: 205, hangCont: 0, cont: 205, teu: 307, change: "+40%", trend: "up",
+                    rongSizes: { "20'": 103, "40'": 102, "45'": 0 },
+                    hangSizes: { "20'": 0, "40'": 0, "45'": 0 },
+                    totalSizes: { "20'": 103, "40'": 102, "45'": 0 }
+                },
+                { 
+                    name: "Hạ bãi quá cảnh", 
+                    rongCont: 0, hangCont: 45, cont: 45, teu: 87, change: "Phương án mới", trend: "up",
+                    rongSizes: { "20'": 0, "40'": 0, "45'": 0 },
+                    hangSizes: { "20'": 3, "40'": 38, "45'": 4 },
+                    totalSizes: { "20'": 3, "40'": 38, "45'": 4 }
+                }
+            ],
+            incidents: [
+                {
+                    title: "Hệ thống hải quan chập chờn dẫn đến thông quan chậm",
+                    time: "Ngày 25/7 và từ 28/7 - 29/7/2026",
+                    level: "trung bình",
+                    hienTrang: "Cảng không truyền Get-In được, hệ thống HQ không tự động trả tờ khai về khiến KH không thể VST/khai ePort để nhận cont hàng nhập.",
+                    nguyenNhan: "Lỗi phát sinh từ hệ thống dữ liệu kết nối hải quan bị chập chờn.",
+                    action: "CSKH phối hợp TVTH hướng dẫn KH VST trước. Đồng thời liên tục truy vấn, đối chiếu tờ khai thủ công trên tool HQ10 cho khách hàng."
+                },
+                {
+                    title: "Ùn tắc khu vực cổng cảng ca trực đêm (00:20 - 03:30)",
+                    time: "Ca đêm 30/7 (Rạng sáng 31/07)",
+                    level: "cao",
+                    hienTrang: "Xe tải chờ lấy container rỗng tập trung, đậu rất nhiều tại khu vực cổng vào.",
+                    nguyenNhan: "Xe nâng X10 hư hỏng đột xuất lúc 00:20. Sau 01:12 phải ưu tiên công tác giải phóng tàu nên không thể giải quyết dứt điểm lượng xe chờ.",
+                    action: "Duty thông báo khắc phục xong xe nâng X10 lúc 01:12. ĐĐHT chủ động điều tiết: không cho tất cả xe vào cùng lúc để đảm bảo ưu tiên giải phóng tàu."
+                }
+            ],
+            callCenter: {
+                total: 219,
+                hotline: 114,
+                midesk: 105,
+                deskPhone: 0,
+                categories: [
+                    { name: "Giao nhận trực tiếp", count: 89, percent: 40.6 },
+                    { name: "e-Port", count: 84, percent: 38.4 },
+                    { name: "Khác", count: 25, percent: 11.4 },
+                    { name: "Hàng nhập chuyển cảng", count: 13, percent: 5.9 },
+                    { name: "Open time", count: 6, percent: 2.7 },
+                    { name: "COV/COD", count: 2, percent: 0.9 }
+                ]
+            },
+            inspections: [
+                { id: 1, client: "Tung Ho", service: "Kiểm hóa", date: "28/7/2026" },
+                { id: 2, client: "GỖ XIANGLONG", service: "Kiểm dịch", date: "28/7/2026" },
+                { id: 3, client: "Interlink", service: "Hun Trùng", date: "28/7/2026" },
+                { id: 4, client: "Khử Trùng Nam Việt", service: "Hun Trùng", date: "29/7/2026" },
+                { id: 5, client: "Khanh Quỳnh Long An", service: "Kiểm hóa", date: "29/7/2026" },
+                { id: 6, client: "Khai Anh Bình Thuận", service: "Kiểm dịch", date: "29/7/2026" },
+                { id: 7, client: "VFC", service: "Hun Trùng", date: "28/7/2026" },
+                { id: 8, client: "Minh Phương Phát Logistics", service: "Kiểm hóa", date: "30/7/2026" },
+                { id: 9, client: "Giấy Sài Gòn", service: "Kiểm hóa", date: "29/7/2026" }
+            ],
+            inspectionTransferCount: "26",
+            marketPromotion: [
+                { 
+                    id: "new_contact", 
+                    label: "Tiếp cận mới", 
+                    count: 2, 
+                    color: "#2563eb", 
+                    companies: [
+                        { name: "CÔNG TY TNHH VẬT LIỆU MỚI KAIYANG VIỆT NAM", kcn: "KCN Châu Đức" },
+                        { name: "CÔNG TY TNHH SHEN MING VIỆT NAM", kcn: "KCN Châu Đức" }
+                    ] 
+                },
+                { 
+                    id: "re_contact", 
+                    label: "Tiếp cận, liên hệ lại", 
+                    count: 3, 
+                    color: "#d97706", 
+                    companies: [
+                        { name: "CÔNG TY TNHH GUMI POLYMER VIETNAM", kcn: "KCN Châu Đức" },
+                        { name: "CÔNG TY TNHH HONG IN VINA", kcn: "KCN Châu Đức" },
+                        { name: "CÔNG TY TNHH UBI VIỆT NAM", kcn: "KCN Châu Đức" }
+                    ] 
+                },
+                { 
+                    id: "follow_up", 
+                    label: "Tiếp tục theo dõi, liên lạc lại sau", 
+                    count: 1, 
+                    color: "#64748b", 
+                    companies: [
+                        { name: "CÔNG TY CỔ PHẦN KHÍ CÔNG NGHIỆP DẦU KHÍ VIỆT HÀN", kcn: "KCN Châu Đức", note: "Chưa có nhu cầu XNK" }
+                    ] 
+                },
+                { 
+                    id: "connected", 
+                    label: "Đã liên hệ", 
+                    count: 5, 
+                    color: "#0891b2", 
+                    companies: [
+                        { name: "CÔNG TY CỔ PHẦN ĐẦU TƯ VHG", kcn: "KCN Châu Đức" },
+                        { name: "CÔNG TY TNHH WON ST VINA", kcn: "KCN Châu Đức" },
+                        { name: "CÔNG TY TNHH AIR KING", kcn: "KCN Châu Đức" },
+                        { name: "CÔNG TY CP NƯỚC GIẢI KHÁT WANA", kcn: "KCN Châu Đức" },
+                        { name: "CÔNG TY CỔ PHẦN VÁN SÀN HÒA PHÁT", kcn: "KCN Châu Đức" }
+                    ] 
+                },
+                { 
+                    id: "met", 
+                    label: "Đã gặp mặt", 
+                    count: 2, 
+                    color: "#059669", 
+                    companies: [
+                        { name: "CÔNG TY TNHH THE SQUARE VINA", kcn: "KCN Châu Đức" },
+                        { name: "CÔNG TY CỔ PHẦN TONG HONG TANNERY VIỆT NAM", kcn: "KCN Mỹ Xuân A2" }
+                    ] 
+                },
+                { 
+                    id: "volume_updated", 
+                    label: "Cập nhật sản lượng áp dụng ưu đãi", 
+                    count: 2, 
+                    color: "#6366f1", 
+                    companies: [
+                        { name: "CÔNG TY KHAI ANH BÌNH THUẬN", kcn: "Ko thuộc KCN" },
+                        { name: "CÔNG TY TNHH KINGSPAN", kcn: "KCN Phú Mỹ 2 & MR" }
+                    ] 
+                },
+                { id: "emailed", label: "Đã gửi email", count: 0, color: "#9333ea", companies: [] },
+                { id: "policy_new", label: "Đã áp dụng chính sách Đối với Khách hàng mới", count: 0, color: "#0ea5e9", companies: [] },
+                { id: "policy_transfer", label: "Đã áp dụng chính sách Hàng chuyển cảng đích CTL -> TCIT", count: 0, color: "#0d9488", companies: [] },
+                { id: "contract_annual", label: "Tờ trình, đề xuất và Hợp đồng áp dụng chính sách hàng năm", count: 0, color: "#e11d48", companies: [] }
+            ],
+            planWeekNext: [
+                { stt: 1, name: "CÔNG TY TNHH WORLD TOP", type: "KH Hiện Hữu", p25: { cont: 65, teu: 119 }, p26: { cont: 20, teu: 34 }, kcn: "KCN Châu Đức" },
+                { stt: 2, name: "CN CÔNG TY CỔ PHẦN TẬP ĐOÀN CƠ KHÍ CÔNG NGHỆ CAO SIBA - NM TP.HCM", type: "KH Mới", p25: null, p26: null, kcn: "KCN Châu Đức" },
+                { stt: 3, name: "CÔNG TY TNHH CHARM MING GLOBAL", type: "KH Hiện Hữu", p25: null, p26: { cont: 17, teu: 18 }, kcn: "KCN Châu Đức" },
+                { stt: 4, name: "CÔNG TY TNHH NHÀ THÉP TRÍ VIỆT", type: "KH Mới", p25: null, p26: null, kcn: "KCN Châu Đức" },
+                { stt: 5, name: "CÔNG TY TNHH RICHBASE (VIỆT NAM)", type: "KH Hiện Hữu", p25: { cont: 1, teu: 1 }, p26: { cont: 7, teu: 11 }, kcn: "KCN Châu Đức" },
+                { stt: 6, name: "CÔNG TY TNHH BESTFULL METAL HOUSEHOLD PRODUCTS (VIỆT NAM)", type: "KH Mới", p25: null, p26: null, kcn: "KCN Châu Đức" },
+                { stt: 7, name: "CÔNG TY TNHH EVERYGREEN GARDEN (VIỆT NAM)", type: "KH Mới", p25: null, p26: null, kcn: "KCN Châu Đức" },
+                { stt: 8, name: "CHI NHÁNH CÔNG TY CỔ PHẦN BM WINDOWS TẠI CHÂU ĐỨC", type: "KH Mới", p25: null, p26: null, kcn: "KCN Châu Đức" },
+                { stt: 9, name: "CÔNG TY TNHH SG CHEMICAL VINA", type: "KH Mới", p25: null, p26: null, kcn: "KCN Châu Đức" },
+                { stt: 10, name: "CÔNG TY TNHH CÔNG NGHIỆP HAN YALE VIỆT NAM", type: "KH Mới", p25: null, p26: null, kcn: "KCN Châu Đức" }
+            ]
+        };
+
+        function DashboardWeek30() {
+            const [activeTab, setActiveTab] = useState("volume");
+            const [selectedPromotion, setSelectedPromotion] = useState("all"); // Thay đổi tab default thị trường thành All
+            const [modalData, setModalData] = useState(null);
+            const [isPrinting, setIsPrinting] = useState(false);
+            
+            // State quản lý animation biểu đồ Recharts với key động
+            const [showMarketChart, setShowMarketChart] = useState(true);
+            const [chartKey, setChartKey] = useState(0);
+
+            useEffect(() => {
+                if (activeTab === "market" || isPrinting) {
+                    setShowMarketChart(false);
+                    const timer = setTimeout(() => {
+                        setShowMarketChart(true);
+                        setChartKey(prev => prev + 1);
+                    }, 120);
+                    return () => clearTimeout(timer);
+                }
+            }, [activeTab, isPrinting]);
+
+            // Xử lý sự kiện in ấn
+            const handlePrintAction = () => {
+                setSelectedPromotion("all");
+                setIsPrinting(true);
+                setActiveTab("market");
+                setShowMarketChart(false);
+                setTimeout(() => {
+                    setShowMarketChart(true);
+                    setChartKey(prev => prev + 1);
+                    setTimeout(() => {
+                        window.dispatchEvent(new Event('resize')); 
+                        setTimeout(() => {
+                            window.print();
+                        }, 400);
+                    }, 500); 
+                }, 100);
+            };
+
+            const activePromoObj = REPORT_DATA.marketPromotion.find(p => p.id === selectedPromotion) || REPORT_DATA.marketPromotion[0];
+            const totalMarketCount = useMemo(() => REPORT_DATA.marketPromotion.reduce((acc, item) => acc + item.count, 0), []);
+
+            const pieChartData = useMemo(() => {
+                return REPORT_DATA.marketPromotion
+                    .filter(item => item.count > 0)
+                    .map(item => ({
+                        name: item.label,
+                        value: item.count,
+                        color: item.color
+                    }));
+            }, []);
+
+            // Hiệu ứng số đếm chạy từ 0 cho 4 thẻ KPI cố định
+            const kpiTeu = useCountUp(REPORT_DATA.overview.totalTeuNum, 1000, true);
+            const kpiIncidents = useCountUp(REPORT_DATA.overview.incidentsNum, 1000, true);
+            const kpiCalls = useCountUp(REPORT_DATA.overview.callCountNum, 1000, true);
+            const kpiTransfers = useCountUp(REPORT_DATA.overview.transferCountNum, 1000, true);
+            const kpiKh = useCountUp(REPORT_DATA.overview.totalConnectedKhNum, 1000, true);
+
+            const isCskhActive = activeTab === "cskh" || isPrinting;
+            const animatedTotal = useCountUp(REPORT_DATA.callCenter.total, 1000, isCskhActive);
+            const animatedHotline = useCountUp(REPORT_DATA.callCenter.hotline, 1000, isCskhActive);
+            const animatedMidesk = useCountUp(REPORT_DATA.callCenter.midesk, 1000, isCskhActive);
+            const animatedDeskPhone = useCountUp(REPORT_DATA.callCenter.deskPhone, 1000, isCskhActive);
+
+            const [progressLoaded, setProgressLoaded] = useState(false);
+            useEffect(() => {
+                if (isCskhActive) {
+                    setProgressLoaded(false);
+                    const timer = setTimeout(() => setProgressLoaded(true), 50);
+                    return () => clearTimeout(timer);
+                } else {
+                    setProgressLoaded(false);
+                }
+            }, [isCskhActive]);
+
+            const getServiceBadgeStyle = (service) => {
+                if (service.includes("Kiểm hóa")) return "bg-amber-100 text-amber-800 border-amber-300";
+                if (service.includes("Kiểm dịch")) return "bg-sky-100 text-sky-800 border-sky-300";
+                if (service.toLowerCase().includes("hun trùng")) return "bg-orange-100 text-orange-800 border-orange-300";
+                return "bg-blue-100 text-blue-800 border-blue-300";
+            };
+
+            const getKcnBadgeStyle = (kcn) => {
+                if (kcn === "KCN Châu Đức") return "bg-emerald-50 text-emerald-700 border-emerald-200";
+                if (kcn === "KCN Phú Mỹ 2 & MR") return "bg-blue-50 text-blue-700 border-blue-200";
+                if (kcn === "KCN Mỹ Xuân A2") return "bg-purple-50 text-purple-700 border-purple-200";
+                return "bg-slate-100 text-slate-600 border-slate-200";
+            };
+
+            const getNoteBadgeStyle = (note) => {
+                if (!note) return "";
+                if (note.includes("Chưa có nhu cầu")) return "bg-orange-100 text-orange-800 border-orange-300";
+                if (note.includes("Chưa hoạt động")) return "bg-orange-100 text-orange-800 border-orange-300";
+                if (note.includes("Chỉ SX nội địa")) return "bg-slate-100 text-slate-600 border-slate-200";
+                if (note.includes("Ngưng hoạt động")) return "bg-slate-800 text-slate-100 border-slate-700";
+                return "bg-amber-50 text-amber-700 border-amber-200";
+            };
+
+            return (
+                <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+                    {/* Header */}
+                    <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 rounded-2xl shadow-xl p-6 mb-6 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                            <div className="flex items-center gap-2 text-blue-200 text-sm font-semibold uppercase tracking-wider mb-1">
+                                <span>Ban CSKH & Dịch vụ Cảng</span>
+                                <span>•</span>
+                                <span>TCIT</span>
+                            </div>
+                            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Dashboard Báo Cáo CLDV Hàng Tuần</h1>
+                            <p className="text-blue-100 text-sm mt-1">{REPORT_DATA.title} ({REPORT_DATA.range})</p>
+                        </div>
+                        <button
+                            onClick={handlePrintAction}
+                            className="print:hidden px-4 py-2.5 bg-white text-blue-900 hover:bg-blue-50 font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer"
+                        >
+                            <IconPrint /> In / Lưu PDF
+                        </button>
+                    </div>
+
+                    {/* 4 Thẻ KPI Cố định */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 items-stretch">
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 relative overflow-hidden flex flex-col justify-between h-full">
+                            <div className="absolute top-0 right-0 w-2 h-full bg-blue-600"></div>
+                            <div>
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">1. Tổng sản lượng GNTT</span>
+                                <div className="text-xl font-black text-slate-800 mt-2 whitespace-nowrap tracking-tight">{kpiTeu.toLocaleString('vi-VN')} TEU</div>
+                            </div>
+                            <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                                <span className="text-slate-500">So với tuần trước:</span>
+                                <span className="font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">{REPORT_DATA.overview.totalGrowth}</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 relative overflow-hidden flex flex-col justify-between h-full">
+                            <div className="absolute top-0 right-0 w-2 h-full bg-amber-500"></div>
+                            <div>
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">2. Số sự vụ CLDV</span>
+                                <div className="text-xl font-black text-slate-800 mt-2 whitespace-nowrap tracking-tight">{kpiIncidents} sự vụ</div>
+                            </div>
+                            <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                                <span className="text-slate-500">Phân loại:</span>
+                                <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">{REPORT_DATA.overview.incidentsDesc}</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 relative overflow-hidden flex flex-col justify-between h-full">
+                            <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500"></div>
+                            <div>
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">3. Tổng đài & CBKH</span>
+                                <div className="text-base font-black text-slate-800 mt-2 tracking-tight leading-snug">
+                                    <div>{kpiCalls} cuộc gọi</div>
+                                    <div className="mt-0.5">{kpiTransfers} lượt chuyển cont</div>
+                                </div>
+                            </div>
+                            <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                                <span className="text-slate-500">Gọi: <strong className="text-rose-600">{REPORT_DATA.overview.callGrowthCall}</strong></span>
+                                <span className="text-slate-500">Chuyển cont: <strong className="text-rose-600">{REPORT_DATA.overview.callGrowthTrans}</strong></span>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 relative overflow-hidden flex flex-col justify-between h-full">
+                            <div className="absolute top-0 right-0 w-2 h-full bg-teal-500"></div>
+                            <div>
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">4. Tổng KH</span>
+                                <div className="text-xl font-black text-slate-800 mt-2 whitespace-nowrap tracking-tight">{kpiKh} công ty</div>
+                            </div>
+                            <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                                <span className="text-slate-500">Xúc tiến thị trường:</span>
+                                <span className="font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded">{REPORT_DATA.overview.khMet}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Navigation Tabs */}
+                    <div className="print:hidden flex flex-wrap gap-2 mb-6 bg-white p-1.5 rounded-xl shadow-sm border border-slate-200">
+                        {[
+                            { id: "volume", label: "Sản lượng GNTT", icon: IconChart },
+                            { id: "incidents", label: "Sự vụ & Hiện trường", icon: IconAlert },
+                            { id: "cskh", label: "Chăm sóc Khách hàng", icon: IconPhone },
+                            { id: "market", label: "Thị trường Khách hàng", icon: IconUsers }
+                        ].map(tab => {
+                            const Icon = tab.icon;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-all duration-200 ${
+                                        activeTab === tab.id
+                                            ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                                    }`}
+                                >
+                                    <Icon />
+                                    <span>{tab.label}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* --- TRANG 1: TAB 1 - SẢN LƯỢNG GNTT --- */}
+                    <div className={activeTab === "volume" ? "print-page-1 space-y-6" : "hidden print:block print-page-1 space-y-6"}>
+                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 shadow-sm">
+                            <h4 className="font-bold text-blue-900 text-sm mb-2 flex items-center gap-2">
+                                <span>📊</span> Nhận xét tổng quan hoạt động GNTT Tuần 31
+                            </h4>
+                            <ul className="space-y-1.5 text-xs text-blue-950 font-medium">
+                                <li className="flex items-start gap-2">
+                                    <span className="text-blue-600 font-bold">•</span>
+                                    <span>Tổng sản lượng giao nhận cổng tại TCIT trong tuần đạt <strong className="text-blue-900">13.186 TEU</strong>, ghi nhận sự sụt giảm <strong className="text-rose-700">-4,5%</strong> so với tuần trước.</span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <span className="text-blue-600 font-bold">•</span>
+                                    <span>Sự sụt giảm tập trung chủ yếu ở các luồng hàng nhập, chuyển cảng và cấp rỗng. Điển hình: <strong className="text-blue-900">Giao cont hàng nhập</strong> giảm -25%; <strong className="text-blue-900">Giao cont chuyển cảng (Dv TCIT)</strong> giảm -18%; <strong className="text-blue-900">Cấp rỗng</strong> giảm -10%.</span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <span className="text-blue-600 font-bold">•</span>
+                                    <span>Bù lại, các luồng hàng trọng điểm khác vẫn tăng trưởng tích cực: <strong className="text-blue-900">Nhận container rỗng</strong> tăng +40%; <strong className="text-blue-900">Hạ cont hàng xuất</strong> tăng +9% (đóng góp cao nhất đạt 3.941 TEU); và phát sinh phương án mới là <strong className="text-blue-900">Hạ bãi quá cảnh</strong> đạt 87 TEU.</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                                <div>
+                                    <h3 className="text-2xl font-black tracking-tight text-slate-800">Chi tiết phương án GNTT (Tuần 31)</h3>
+                                    <p className="text-xs text-slate-500 font-semibold italic mt-0.5 print:hidden">Click vào các cột số lượng để xem chi tiết size</p>
+                                </div>
+                                <span className="text-xs text-slate-500 font-semibold italic">Đơn vị: Cont / TEU</span>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr className="border-b border-slate-200 text-slate-500 uppercase bg-slate-50/50">
+                                            <th className="py-3 px-4 font-semibold">Phương án tác nghiệp</th>
+                                            <th className="py-3 px-4 font-semibold text-center">Sản lượng rỗng (Cont)</th>
+                                            <th className="py-3 px-4 font-semibold text-center">Sản lượng hàng (Cont)</th>
+                                            <th className="py-3 px-4 font-semibold text-center bg-slate-100">Tổng Cont</th>
+                                            <th className="py-3 px-4 font-semibold text-right bg-blue-50/50 text-blue-900">Sản lượng (TEU)</th>
+                                            <th className="py-3 px-4 font-semibold text-right">So với tuần trước</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 text-sm">
+                                        {REPORT_DATA.volumeDetails.map((item, idx) => (
+                                            <tr key={idx} className="hover:bg-blue-50/50 transition-colors">
+                                                <td className="py-3.5 px-4 font-medium text-slate-800 text-xs">{item.name}</td>
+                                                <td 
+                                                    onClick={() => setModalData({ type: 'volume', title: 'Chi tiết số lượng cont theo kích cỡ', subtitle: `${item.name} - Sản lượng rỗng`, sizes: item.rongSizes })}
+                                                    className="py-3.5 px-4 text-center text-blue-700 font-semibold cursor-pointer hover:bg-blue-100/80 transition-colors"
+                                                >
+                                                    {item.rongCont > 0 ? item.rongCont.toLocaleString() : '-'}
+                                                </td>
+                                                <td 
+                                                    onClick={() => setModalData({ type: 'volume', title: 'Chi tiết số lượng cont theo kích cỡ', subtitle: `${item.name} - Sản lượng hàng`, sizes: item.hangSizes })}
+                                                    className="py-3.5 px-4 text-center text-blue-700 font-semibold cursor-pointer hover:bg-blue-100/80 transition-colors"
+                                                >
+                                                    {item.hangCont > 0 ? item.hangCont.toLocaleString() : '-'}
+                                                </td>
+                                                <td 
+                                                    onClick={() => setModalData({ type: 'volume', title: 'Chi tiết số lượng cont theo kích cỡ', subtitle: `${item.name} - Tổng container (Hàng & Rỗng)`, sizes: item.totalSizes })}
+                                                    className="py-3.5 px-4 text-center font-bold text-slate-800 bg-slate-50/80 cursor-pointer hover:bg-slate-200/80 transition-colors"
+                                                >
+                                                    {item.cont > 0 ? item.cont.toLocaleString() : '-'}
+                                                </td>
+                                                <td className="py-3.5 px-4 text-right font-black text-blue-600 bg-blue-50/30 text-base">{item.teu > 0 ? item.teu.toLocaleString() : '-'}</td>
+                                                <td className="py-3.5 px-4 text-right">
+                                                    <span className={`inline-block px-2.5 py-0.5 rounded text-xs font-bold ${
+                                                        item.trend === "up" ? "bg-emerald-100 text-emerald-700" :
+                                                        item.trend === "down" ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"
+                                                    }`}>
+                                                        {item.change}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* --- TRANG 2: TAB 2 - SỰ VỤ & HIỆN TRƯỜNG --- */}
+                    <div className={activeTab === "incidents" ? "print-page-2 space-y-6 mt-6" : "hidden print:block print-page-2 space-y-6"}>
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                            <h3 className="text-2xl font-black tracking-tight text-slate-800">Sự vụ & Hiện trường Tuần 31</h3>
+                            <p className="text-slate-500 text-sm mt-1 font-semibold">Ghi nhận và biện pháp xử lý các sự vụ liên quan đến chất lượng dịch vụ</p>
+                        </div>
+
+                        <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-xl border-y border-r border-emerald-200">
+                            <div className="flex items-start">
+                                <div className="flex-shrink-0 text-emerald-600 mt-0.5"><IconAlert /></div>
+                                <div className="ml-3">
+                                    <h4 className="text-sm font-bold text-emerald-900">Ghi nhận 02 sự vụ liên quan đến CLDV tại hiện trường</h4>
+                                    <p className="text-xs text-emerald-700 font-medium mt-0.5">Đã được Ban CSKH & DVC phối hợp xử lý và kiểm soát kịp thời.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {REPORT_DATA.incidents.map((inc, i) => (
+                                <div key={i} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between">
+                                    <div>
+                                        <div className="flex justify-between items-start gap-4 mb-3">
+                                            <h4 className="font-bold text-slate-800 text-lg leading-snug">{inc.title}</h4>
+                                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap ${
+                                                inc.level === "cao" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"
+                                            }`}>
+                                                Mức độ {inc.level}
+                                            </span>
+                                        </div>
+                                        <div className="text-xs font-semibold text-slate-400 mb-4">
+                                            <span>⏱️ {inc.time}</span>
+                                        </div>
+                                        
+                                        <div className="space-y-3 mb-4">
+                                            <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm">
+                                                <strong className="text-slate-900 block mb-1 text-xs uppercase tracking-wider text-blue-600">Hiện trạng:</strong>
+                                                <p className="text-slate-700">{inc.hienTrang}</p>
+                                            </div>
+                                            <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm">
+                                                <strong className="text-slate-900 block mb-1 text-xs uppercase tracking-wider text-amber-600">Nguyên nhân:</strong>
+                                                <p className="text-slate-700">{inc.nguyenNhan}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="border-t border-slate-100 pt-4 mt-2">
+                                        <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider block mb-1">✓ Biện pháp xử lý & Khắc phục</span>
+                                        <p className="text-sm text-slate-700 font-medium">{inc.action}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* --- TRANG 3: TAB 3 - CHĂM SÓC KHÁCH HÀNG --- */}
+                    <div className={activeTab === "cskh" ? "print-page-3 grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6" : "hidden print:block print-page-3 grid grid-cols-1 lg:grid-cols-3 gap-6"}>
+                        <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between">
+                            <div>
+                                <h3 className="text-2xl font-black tracking-tight text-slate-800 mb-4 flex items-center gap-2">
+                                    <IconPhone /> Tổng đài CSKH
+                                </h3>
+                                <div className="bg-blue-50 rounded-xl p-4 text-center mb-6 border border-blue-100">
+                                    <span className="text-xs text-blue-600 font-bold uppercase">Tổng tiếp nhận</span>
+                                    <div className="text-4xl font-black text-blue-700 my-1">{animatedTotal}</div>
+                                    <span className="text-xs text-slate-500">Cuộc gọi & Yêu cầu hỗ trợ</span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 text-center mb-6">
+                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                        <span className="text-xs text-slate-400 block">Hotline</span>
+                                        <span className="font-bold text-slate-800 text-lg">{animatedHotline}</span>
+                                    </div>
+                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                        <span className="text-xs text-slate-400 block">3CX/Midesk</span>
+                                        <span className="font-bold text-slate-800 text-lg">{animatedMidesk}</span>
+                                    </div>
+                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                        <span className="text-xs text-slate-400 block">Đt bàn</span>
+                                        <span className="font-bold text-slate-800 text-lg">{animatedDeskPhone}</span>
+                                    </div>
+                                </div>
+                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Phân loại nội dung hỗ trợ</h4>
+                                <div className="space-y-3">
+                                    {REPORT_DATA.callCenter.categories.map((cat, idx) => (
+                                        <div key={idx} className="text-sm">
+                                            <div className="flex justify-between font-medium text-slate-700 mb-1">
+                                                <span>{cat.name}</span>
+                                                <span className="font-bold text-slate-900">{cat.count} (<span className="text-blue-600">{cat.percent}%</span>)</span>
+                                            </div>
+                                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                                <div 
+                                                    className="bg-blue-600 h-2 rounded-full transition-all duration-1000 ease-out" 
+                                                    style={{ width: progressLoaded ? `${cat.percent}%` : '0%' }}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                            <div className="p-6 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                                <div>
+                                    <h3 className="text-2xl font-black tracking-tight text-slate-800">Kiểm hóa, kiểm dịch, hun trùng</h3>
+                                    <p className="text-xs text-slate-500 mt-0.5 font-semibold">Danh sách chi tiết lượt kiểm hóa, kiểm dịch và hun trùng trong tuần</p>
+                                </div>
+                                <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-bold text-xs rounded-full">
+                                    {REPORT_DATA.inspectionTransferCount} lượt chuyển cont của {REPORT_DATA.inspections.length} khách hàng
+                                </span>
+                            </div>
+                            <div className="p-6 flex-1 overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-slate-200 text-slate-400 text-xs uppercase bg-slate-50/50">
+                                            <th className="py-3 px-4 font-semibold">STT</th>
+                                            <th className="py-3 px-4 font-semibold">Khách hàng</th>
+                                            <th className="py-3 px-4 font-semibold">Loại Dịch vụ</th>
+                                            <th className="py-3 px-4 font-semibold">Thời gian</th>
+                                            <th className="py-3 px-4 font-semibold text-right">Trạng thái</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 text-sm">
+                                        {REPORT_DATA.inspections.map((row) => (
+                                            <tr key={row.id} className="hover:bg-slate-50">
+                                                <td className="py-3 px-4 text-slate-400 font-medium">#{row.id}</td>
+                                                <td className="py-3 px-4 font-bold text-slate-800 break-words max-w-sm">{row.client}</td>
+                                                <td className="py-3 px-4">
+                                                    <span className={`px-2.5 py-1 rounded text-xs font-semibold border ${getServiceBadgeStyle(row.service)}`}>
+                                                        {row.service}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 px-4 text-slate-600">{row.date}</td>
+                                                <td className="py-3 px-4 text-right">
+                                                    <span className="text-xs font-bold text-emerald-600 flex items-center justify-end">
+                                                        <IconCheck /> Đã hoàn tất
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* --- TAB 4: THỊ TRƯỜNG KHÁCH HÀNG --- */}
+                    <div className={activeTab === "market" ? "space-y-8 mt-6" : "hidden print:block space-y-8"}>
+                        
+                        {/* --- TRANG 4: Bản đồ, Biểu đồ & Các nút thống kê tiến trình --- */}
+                        <div className="print-page-4 space-y-8">
+                            {/* Link Google My Map */}
+                            <div className="bg-gradient-to-r from-sky-600 to-blue-700 rounded-xl p-4 text-white shadow-md flex flex-col sm:flex-row justify-between items-center gap-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center font-bold text-lg">🗺️</div>
+                                    <div>
+                                        <h4 className="font-bold text-base">Bản đồ trực quan Khách hàng quanh KCN Cái Mép</h4>
+                                        <p className="text-xs text-sky-100">Truy cập Google My Map để xem vị trí chi tiết và lộ trình tuyến đường.</p>
+                                    </div>
+                                </div>
+                                <a 
+                                    href="https://www.google.com/maps/d/viewer?hl=vi&mid=1lsFEs0iI9Cyg8qnvewzJ79g7o1XWktI&ll=10.582220761656924%2C107.06280695562646&z=13" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="px-4 py-2 bg-white text-blue-700 font-bold text-xs rounded-lg hover:bg-sky-50 transition-colors shadow whitespace-nowrap"
+                                >
+                                    Mở Google My Map ↗
+                                </a>
+                            </div>
+
+                            {/* Biểu đồ tròn (Pie Chart) với key động đảm bảo animation quay luôn kích hoạt */}
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                                <h4 className="font-bold text-slate-800 text-base mb-4 text-center">Biểu đồ tỷ trọng phân bổ tiến trình thị trường</h4>
+                                <div className="w-full h-72 flex justify-center items-center">
+                                    {(activeTab === "market" || isPrinting) && showMarketChart && (
+                                        <ResponsiveContainer key={`res-container-${chartKey}`} width="100%" height={280}>
+                                            <PieChart key={`pie-chart-${chartKey}`} margin={{ top: 20, right: 70, left: 70, bottom: 20 }}>
+                                                <Pie
+                                                    key={`pie-${chartKey}`}
+                                                    data={pieChartData}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    labelLine={true}
+                                                    outerRadius={80}
+                                                    fill="#8884d8"
+                                                    dataKey="value"
+                                                    isAnimationActive={true}
+                                                    animationBegin={0}
+                                                    animationDuration={1500}
+                                                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                                                >
+                                                    {pieChartData.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip formatter={(value) => [`${value} công ty`, 'Số lượng']} />
+                                                <Legend verticalAlign="bottom" height={36}/>
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Các nút / Thẻ số lượng thống kê theo tiến trình */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 items-stretch">
+                                <button
+                                    onClick={() => setSelectedPromotion("all")}
+                                    className={`p-3.5 rounded-xl border text-left transition-all relative flex flex-col justify-between h-full cursor-pointer shadow-md col-span-2 sm:col-span-1 lg:col-span-2 ${
+                                        selectedPromotion === "all"
+                                            ? "bg-gradient-to-br from-emerald-600 to-teal-700 text-white ring-2 ring-emerald-400 shadow-xl border-transparent scale-[1.01]"
+                                            : "bg-gradient-to-br from-slate-900 via-emerald-950 to-teal-950 text-white hover:opacity-95 border-emerald-800/60"
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-emerald-200 flex items-center gap-1.5">
+                                            <span className="text-amber-400">⭐</span> Toàn bộ tiến trình (Tổng hợp)
+                                        </span>
+                                    </div>
+                                    <div className="flex items-baseline justify-between mt-auto pt-2 border-t border-white/15">
+                                        <span className="text-3xl font-black text-white">
+                                            {totalMarketCount}
+                                        </span>
+                                        <span className="text-[11px] font-bold bg-white/20 px-2.5 py-0.5 rounded-full text-white">Tất cả KH</span>
+                                    </div>
+                                </button>
+
+                                {REPORT_DATA.marketPromotion.map((item) => {
+                                    const isSelected = selectedPromotion === item.id;
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => setSelectedPromotion(item.id)}
+                                            className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between h-full cursor-pointer ${
+                                                isSelected
+                                                    ? `ring-2 ring-emerald-600 shadow-md text-white border-transparent`
+                                                    : "bg-white border-emerald-200 hover:bg-emerald-100/60 text-slate-700"
+                                            }`}
+                                            style={{ backgroundColor: isSelected ? item.color : undefined }}
+                                        >
+                                            <span className={`text-xs font-semibold leading-tight block mb-2 ${isSelected ? "text-white/90" : "text-slate-700"}`}>
+                                                {item.label}
+                                            </span>
+                                            <div className="flex items-baseline justify-between mt-auto pt-2 border-t border-black/5">
+                                                <span className={`text-2xl font-black ${isSelected ? "text-white" : "text-slate-900"}`}>
+                                                    {item.count}
+                                                </span>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* --- Danh sách công ty sổ ra & Kế hoạch tuần tới --- */}
+                        <div className="print-page-4-details space-y-8">
+                            {/* Xúc tiến thương mại */}
+                            <div className="bg-emerald-50/90 rounded-xl shadow-sm border border-emerald-200 p-6 md:p-8 print-compact-section">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-emerald-200 pb-5">
+                                    <div>
+                                        <span className="px-3 py-1 bg-emerald-600 text-white font-bold text-xs rounded-full inline-block mb-2">
+                                            Kết quả theo tiến trình
+                                        </span>
+                                        <h3 className="text-2xl font-black tracking-tight text-emerald-950">Kết quả công tác xúc tiến thị trường Tuần 31</h3>
+                                        <p className="text-emerald-800 text-sm mt-1 font-semibold print:hidden">Click vào tên tiến trình để hiển thị danh sách khách hàng với tiến trình tương ứng</p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-xl p-5 border border-emerald-200 shadow-inner">
+                                    {selectedPromotion === "all" ? (
+                                        <div className="space-y-6">
+                                            <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-200">
+                                                <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                                    <span>⭐</span> Toàn bộ khách hàng theo tiến trình (Tổng hợp)
+                                                </h4>
+                                                <span className="text-xs font-bold bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 text-emerald-800">
+                                                    Tổng số: {totalMarketCount} công ty
+                                                </span>
+                                            </div>
+                                            {REPORT_DATA.marketPromotion.map((promo, pIdx) => (
+                                                <div key={pIdx} className="bg-slate-50/70 rounded-xl p-4 border border-slate-200 shadow-sm print-compact-section">
+                                                    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-200">
+                                                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: promo.color }}></span>
+                                                        <h5 className="font-bold text-slate-800 text-sm">{promo.label}</h5>
+                                                        <span className="ml-auto text-xs font-bold bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-600">{promo.count} công ty</span>
+                                                    </div>
+                                                    {promo.companies.length > 0 ? (
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 print-compact-grid">
+                                                            {promo.companies.map((comp, cIdx) => (
+                                                                <div key={cIdx} className="bg-white p-3.5 rounded-xl border border-slate-200 text-sm flex flex-col justify-between gap-2 shadow-sm print-compact-card">
+                                                                    <div className="flex items-start gap-2 font-semibold text-slate-800">
+                                                                        <span className="w-5 h-5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] flex items-center justify-center flex-shrink-0 mt-0.5 border border-emerald-200">
+                                                                            {cIdx + 1}
+                                                                        </span>
+                                                                        <span className="leading-snug">{comp.name}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-end gap-1.5 pt-2 border-t border-slate-100 mt-auto">
+                                                                        {comp.note && <span className={`text-[11px] font-semibold px-2 py-0.5 rounded border ${getNoteBadgeStyle(comp.note)}`}>{comp.note}</span>}
+                                                                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded border ${getKcnBadgeStyle(comp.kcn)}`}>{comp.kcn}</span>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-xs text-slate-400 italic">Không có công ty nào.</p>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-200">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: activePromoObj.color }}></span>
+                                                    <h4 className="font-bold text-slate-800 text-sm">{activePromoObj.label}</h4>
+                                                </div>
+                                                <span className="text-xs font-bold bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 text-emerald-800">
+                                                    Số lượng: {activePromoObj.count} công ty
+                                                </span>
+                                            </div>
+                                            
+                                            {activePromoObj.companies.length > 0 ? (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 items-stretch print-compact-grid">
+                                                    {activePromoObj.companies.map((comp, cIdx) => (
+                                                        <div 
+                                                            key={cIdx} 
+                                                            className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between gap-3 hover:border-emerald-400 hover:shadow transition-all h-full print-compact-card"
+                                                        >
+                                                            <div className="flex items-start gap-3 font-medium text-sm text-slate-700">
+                                                                <span className="w-6 h-6 rounded-full bg-emerald-50 text-emerald-700 font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5 border border-emerald-200">
+                                                                    {cIdx + 1}
+                                                                </span>
+                                                                <span className="leading-snug break-words flex-1 font-semibold text-slate-800">{comp.name}</span>
+                                                            </div>
+                                                            <div className="flex flex-wrap items-center justify-end gap-1.5 pt-2 border-t border-slate-100 mt-auto">
+                                                                {comp.note && (
+                                                                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded border ${getNoteBadgeStyle(comp.note)}`}>
+                                                                        {comp.note}
+                                                                    </span>
+                                                                )}
+                                                                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded border ${getKcnBadgeStyle(comp.kcn)}`}>
+                                                                    {comp.kcn}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="py-8 text-center text-slate-400 text-sm">
+                                                    Không có công ty nào thuộc nhóm tiến trình này.
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Kế hoạch tuần tới */}
+                            <div className="bg-sky-50/90 rounded-2xl shadow-sm border border-sky-200 p-6 md:p-8 text-slate-800 relative overflow-hidden print-compact-section">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-sky-200 pb-5">
+                                    <div>
+                                        <span className="px-3 py-1 bg-sky-600 text-white font-bold text-xs rounded-full inline-block mb-2">
+                                            Kế hoạch trọng điểm
+                                        </span>
+                                        <h3 className="text-2xl font-black tracking-tight text-sky-950">Kế Hoạch Xúc Tiến Thị Trường Tuần 32</h3>
+                                        <p className="text-sky-800 text-sm mt-1 font-semibold print:hidden">Click vào tên công ty để hiển thị thông tin sản lượng GNTT qua TCIT</p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-xl border border-sky-200 p-4 shadow-inner">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-stretch print-compact-grid">
+                                        {REPORT_DATA.planWeekNext.map((comp) => {
+                                            const isNew = comp.type.includes("Mới");
+                                            return (
+                                                <div 
+                                                    key={comp.stt} 
+                                                    onClick={() => setModalData({
+                                                        type: 'plan',
+                                                        title: comp.name,
+                                                        p25: comp.p25,
+                                                        p26: comp.p26
+                                                    })}
+                                                    className="p-3.5 bg-white rounded-xl border border-slate-200 flex flex-col justify-between gap-3 hover:border-sky-400 hover:shadow transition-all h-full cursor-pointer shadow-sm print-compact-card"
+                                                >
+                                                    <div className="flex items-start gap-3 font-medium text-sm text-slate-700">
+                                                        <span className="w-6 h-6 rounded-full bg-sky-50 text-sky-700 font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5 border border-sky-200">
+                                                            {comp.stt}
+                                                        </span>
+                                                        <span className="leading-snug break-words flex-1 font-semibold text-slate-800">{comp.name}</span>
+                                                    </div>
+                                                    <div className="flex flex-wrap items-center justify-end gap-1.5 pt-2 border-t border-slate-100 mt-auto">
+                                                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded border ${
+                                                            isNew 
+                                                                ? "bg-sky-50 text-sky-700 border-sky-200" 
+                                                                : "bg-amber-50 text-amber-700 border-amber-200"
+                                                        }`}>
+                                                            {comp.type}
+                                                        </span>
+                                                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded border ${getKcnBadgeStyle(comp.kcn)}`}>
+                                                            {comp.kcn}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    {/* MODAL POPUP */}
+                    {modalData && (
+                        <div 
+                            className="print:hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 transition-opacity duration-300"
+                            onClick={() => setModalData(null)}
+                        >
+                            <div 
+                                className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 transform transition-all"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div className="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
+                                    <div>
+                                        <h3 className="font-bold text-slate-800 text-base leading-snug">{modalData.title}</h3>
+                                        {modalData.subtitle && <p className="text-xs text-blue-600 font-semibold mt-0.5">{modalData.subtitle}</p>}
+                                    </div>
+                                    <button 
+                                        onClick={() => setModalData(null)}
+                                        className="text-slate-400 hover:text-slate-600 font-bold text-lg p-1"
+                                    >&times;</button>
+                                </div>
+
+                                {modalData.type === 'volume' && (
+                                    <div className="overflow-x-auto mb-5">
+                                        <table className="w-full text-left border-collapse text-sm">
+                                            <thead>
+                                                <tr className="border-b border-slate-200 text-slate-500 uppercase text-xs bg-slate-50">
+                                                    <th className="py-2.5 px-3 font-semibold">Kích cỡ container</th>
+                                                    <th className="py-2.5 px-3 font-semibold text-right">Số lượng (Cont)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                                                {Object.entries(modalData.sizes).map(([size, val], sIdx) => (
+                                                    <tr key={sIdx} className="hover:bg-slate-50">
+                                                        <td className="py-2.5 px-3">{size}</td>
+                                                        <td className="py-2.5 px-3 text-right font-bold text-blue-600">
+                                                            {typeof val === 'number' ? val.toLocaleString() : val}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
+                                {modalData.type === 'plan' && (
+                                    <div className="overflow-x-auto mb-5">
+                                        <p className="text-xs text-slate-500 mb-3 font-medium">Thống kê sản lượng GNTT qua TCIT theo năm:</p>
+                                        <table className="w-full text-left border-collapse text-sm">
+                                            <thead>
+                                                <tr className="border-b border-slate-200 text-slate-500 uppercase text-xs bg-slate-50">
+                                                    <th className="py-2.5 px-3 font-semibold">Năm</th>
+                                                    <th className="py-2.5 px-3 font-semibold text-center">Cont</th>
+                                                    <th className="py-2.5 px-3 font-semibold text-right">TEU</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                                                <tr className="hover:bg-slate-50">
+                                                    <td className="py-2.5 px-3 font-bold text-slate-800">2025</td>
+                                                    <td className="py-2.5 px-3 text-center font-semibold text-blue-600">
+                                                        {modalData.p25 ? `${modalData.p25.cont} conts` : '-'}
+                                                    </td>
+                                                    <td className="py-2.5 px-3 text-right font-semibold text-emerald-600">
+                                                        {modalData.p25 ? `${modalData.p25.teu} teus` : '-'}
+                                                    </td>
+                                                </tr>
+                                                <tr className="hover:bg-slate-50">
+                                                    <td className="py-2.5 px-3 font-bold text-slate-800">2026</td>
+                                                    <td className="py-2.5 px-3 text-center font-semibold text-blue-600">
+                                                        {modalData.p26 ? `${modalData.p26.cont} conts` : '-'}
+                                                    </td>
+                                                    <td className="py-2.5 px-3 text-right font-semibold text-emerald-600">
+                                                        {modalData.p26 ? `${modalData.p26.teu} teus` : '-'}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
+                                <div className="mt-4 flex justify-end">
+                                    <button 
+                                        onClick={() => setModalData(null)}
+                                        className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow transition-all"
+                                    >
+                                        Đóng
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const rootElement = document.getElementById('root');
+        ReactDOM.render(<DashboardWeek30 />, rootElement);
+    </script>
+</body>
+</html>
