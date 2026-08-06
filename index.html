@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Quản Lý Chất Lượng Dịch Vụ Khách Hàng - TCIT</title>
+    <title>Dashboard Báo cáo ca trực - TCIT</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js -->
@@ -78,20 +78,19 @@
                         <i class="fa-solid fa-ship text-2xl"></i>
                     </div>
                     <div>
-                        <h1 class="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight">DASHBOARD BÁO CÁO CHẤT LƯỢNG DỊCH VỤ KHÁCH HÀNG</h1>
+                        <h1 class="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight">DASHBOARD BÁO CÁO CA TRỰC</h1>
                         <p class="text-sm font-medium text-slate-500 mt-1 flex items-center gap-2">
-                            <span><i class="fa-regular fa-building text-sky-600"></i> Cảng Tân Cảng - Cai Mép (TCIT)</span>
+                            <span><i class="fa-solid fa-user-check text-sky-600"></i> Nhân viên trực ca: Vũ Văn Tuấn
+                </span>
                             <span>•</span>
-                            <span><i class="fa-regular fa-calendar-alt text-sky-600"></i> Ca trực: 04/08/2026 - 05/08/2026</span>
+                            <span><i class="fa-regular fa-calendar-alt text-sky-600"></i> Ca trực: Từ 18:30 ngày 04/08/2026 - 06:30 ngày 05/08/2026</span>
                         </p>
                     </div>
                 </div>
             </div>
             <div class="flex items-center gap-3 self-start md:self-auto">
                 <div class="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl font-semibold text-xs flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Hệ thống hoạt động bình thường
-                </div>
+                    
                 <button onclick="window.print()" class="px-4 py-2 bg-white text-slate-700 border border-slate-200 rounded-xl font-semibold text-xs hover:bg-slate-50 transition flex items-center gap-2 shadow-sm">
                     <i class="fa-solid fa-print"></i> Xuất Báo Cáo
                 </button>
@@ -266,7 +265,7 @@
                 <h3 class="font-bold text-slate-800">Cảnh Báo Nghẽn Bãi & KPI OC</h3>
             </div>
             <p class="text-xs text-slate-600 leading-relaxed">
-                Có <strong class="text-amber-700">3/5 lượt yêu cầu gắp cont</strong> vượt mốc KPI 20 phút. Đặc biệt tại <strong class="text-slate-800">Line A02 (40 phút)</strong> và <strong class="text-slate-800">Line C10 (30 phút)</strong> vào lúc 00:30 - 02:00 sáng. Đây cũng là thời điểm sản lượng GNTT đạt đỉnh (39 cont/giờ).
+                Có <strong class="text-amber-700">3/5 lượt yêu cầu gắp cont</strong> vượt mốc KPI 20 phút. Đặc biệt tại <strong class="text-slate-800">Line A02 (40 phút)</strong> và <strong class="text-slate-800">Line C11 (30 phút)</strong> vào lúc 00:30 - 02:00 sáng. Đây cũng là thời điểm sản lượng GNTT đạt đỉnh (39 cont/giờ).
             </p>
         </div>
 
@@ -290,7 +289,7 @@
                 <h3 class="font-bold text-slate-800">Khuyên Nghị & Giải Pháp</h3>
             </div>
             <ul class="text-xs text-slate-600 space-y-1.5 list-disc list-inside">
-                <li>Tăng cường thêm 01 xe gắp/RTG cho khu vực <strong>Block A & Block C</strong> từ 01:00 đến 03:30.</li>
+                <li>OC phối hợp hõ trợ tối đa phục vụ khách hàng cho khu vực <strong>Line A & C</strong> từ 01:00 đến 03:30.</li>
                 <li>Rà soát lỗi không khớp Seal/Tờ khai (Cont IAAU1837906) tại Cổng GNCB.</li>
             </ul>
         </div>
@@ -378,7 +377,7 @@
                         <td class="py-3 px-4"><span class="px-2 py-0.5 bg-sky-50 text-sky-600 border border-sky-200 rounded font-medium">Hotline</span></td>
                         <td class="py-3 px-4 font-mono">0766 765 586</td>
                         <td class="py-3 px-4"><span class="px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full font-bold text-[11px]">OC</span></td>
-                        <td class="py-3 px-4 font-bold text-slate-700">Line C10</td>
+                        <td class="py-3 px-4 font-bold text-slate-700">Line C11</td>
                         <td class="py-3 px-4"><span class="text-rose-600 font-extrabold">30 phút</span></td>
                         <td class="py-3 px-4 font-medium">Hỗ trợ gắp cont C11 SLSU8042512</td>
                         <td class="py-3 px-4 text-center"><span class="px-2.5 py-0.5 bg-rose-100 text-rose-800 rounded-full font-semibold text-[10px]">Vượt KPI</span></td>
@@ -436,7 +435,7 @@
                         <td class="py-3 px-4 text-slate-400">-</td>
                         <td class="py-3 px-4 text-slate-400">-</td>
                         <td class="py-3 px-4 font-medium">TK ko khop IAAU1837906 (Ko khop seal)</td>
-                        <td class="py-3 px-4 text-center"><span class="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-semibold text-[10px]">Đã hướng dẫn</span></td>
+                        <td class="py-3 px-4 text-center"><span class="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-semibold text-[10px]">Đã xử lý</span></td>
                     </tr>
                 </tbody>
             </table>
@@ -445,7 +444,6 @@
 
     <!-- Footer -->
     <footer class="text-center text-xs text-slate-400 py-4 border-t border-slate-200">
-        <p>© 2026 TAN CANG - CAI MEP INTERNATIONAL TERMINAL (TCIT). ALL RIGHTS RESERVED.</p>
         <p class="mt-1">Báo cáo được tự động khởi tạo dựa trên dữ liệu nhật ký cuộc gọi & sản lượng GNTT.</p>
     </footer>
 
@@ -601,7 +599,7 @@
         new Chart(ctxOc, {
             type: 'bar',
             data: {
-                labels: ['Line C10 (23:51)', 'Line A02 (01:36)', 'Line A02 (01:55)', 'Line C11 (03:51)', 'Line C14 (04:04)'],
+                labels: ['Line C11 (23:51)', 'Line A02 (01:36)', 'Line A02 (01:55)', 'Line C11 (03:51)', 'Line C14 (04:04)'],
                 datasets: [
                     {
                         type: 'line',
